@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EntryStatus {
+  visitor
+  entry_pending
+  entry_confirmed
+  revoked
+}
+
+enum MembershipStatus {
+  none
+  awaiting_activation
+  active
+  dormant
+  decayed
+  revoked
+}
+
+enum RankCode {
+  none
+  verified
+  elite
+  vanguard
+  genesis_founder
+}
+
+enum AccountRole {
+  member
+  founder
+  admin
+  operations
+  billing
+  moderator
+  support
+}
+
+enum BadgeStatus {
+  disabled
+  enabled
+}
+
+enum DecayState {
+  none
+  dormant
+  decayed
+}
+
+enum PurchaseProvider {
+  stripe
+}
+
+enum PurchaseStatus {
+  pending
+  paid
+  failed
+  refunded
+  canceled
+}
+
+enum SubscriptionPlanCode {
+  core_membership
+}
+
+enum SubscriptionStatus {
+  pending
+  active
+  past_due
+  expired
+  canceled
+  revoked
+}
+
+enum WebhookDeliveryStatus {
+  pending
+  processing
+  succeeded
+  failed
+}
+
+enum JobRunStatus {
+  running
+  succeeded
+  failed
+}
+
+model User {
+  id                     String             @id @default(uuid()) @db.Uuid
+  username               String             @unique
+  email                  String             @unique
+  passwordHash           String             @map("password_hash")
+  discordId              String?            @unique @map("discord_id")
+  forumUid               Int?               @unique @map("forum_uid")
+  accountRole            AccountRole        @default(member) @map("account_role")
+  entryStatus            EntryStatus        @default(visitor) @map("entry_status")
+  membershipStatus       MembershipStatus   @default(none) @map("membership_status")
+  rank                   RankCode           @default(none)
+  badgeStatus            BadgeStatus        @default(disabled) @map("badge_status")
+  activationDeadline     DateTime?          @map("activation_deadline")
+  subscriptionExpiresAt  DateTime?          @map("subscription_expires_at")
+  decayState             DecayState         @default(none) @map("decay_state")
+  lastSyncAt             DateTime?          @map("last_sync_at")
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+  entryPurchases         EntryPurchase[]
+  activationWindow       ActivationWindow?
+  subscriptions          Subscription[]
+  ranks                  Rank[]
+  badges                 Badge[]
+  discordSyncLogs        DiscordSyncLog[]
+  webhookDeliveries      WebhookDelivery[]
+  auditLogs              AuditLog[]         @relation("AuditUser")
+  actorAuditLogs         AuditLog[]         @relation("AuditActor")
+
+  @@map("users")
+}
+
+model EntryPurchase {
+  id                        String           @id @default(uuid()) @db.Uuid
+  userId                    String?          @db.Uuid @map("user_id")
+  provider                  PurchaseProvider
+  providerPaymentId         String?          @unique @map("provider_payment_id")
+  providerCheckoutSessionId String?          @unique @map("provider_checkout_session_id")
+  email                     String
+  requestedUsername         String           @map("requested_username")
+  requestedPasswordHash     String           @map("requested_password_hash")
+  amount                    Int
+  currency                  String
+  status                    PurchaseStatus
+  paidAt                    DateTime?        @map("paid_at")
+  createdAt                 DateTime         @default(now()) @map("created_at")
+  user                      User?            @relation(fields: [userId], references: [id])
+
+  @@map("entry_purchases")
+}
+
+model ActivationWindow {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @unique @db.Uuid @map("user_id")
+  deadlineAt DateTime  @map("deadline_at")
+  activatedAt DateTime? @map("activated_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@map("activation_windows")
+}
+
+model Subscription {
+  id                     String               @id @default(uuid()) @db.Uuid
+  userId                 String               @db.Uuid @map("user_id")
+  planCode               SubscriptionPlanCode @map("plan_code")
+  provider               PurchaseProvider
+  providerSubscriptionId String               @unique @map("provider_subscription_id")
+  status                 SubscriptionStatus
+  startsAt               DateTime             @map("starts_at")
+  expiresAt              DateTime             @map("expires_at")
+  canceledAt             DateTime?            @map("canceled_at")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+  user                   User                 @relation(fields: [userId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model Rank {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid @map("user_id")
+  rankCode  RankCode  @map("rank_code")
+  grantedAt DateTime  @default(now()) @map("granted_at")
+  revokedAt DateTime? @map("revoked_at")
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@map("ranks")
+}
+
+model Badge {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @db.Uuid @map("user_id")
+  badgeCode RankCode    @map("badge_code")
+  status    BadgeStatus
+  grantedAt DateTime    @default(now()) @map("granted_at")
+  revokedAt DateTime?   @map("revoked_at")
+  user      User        @relation(fields: [userId], references: [id])
+
+  @@map("badges")
+}
+
+model DiscordSyncLog {
+  id           String                @id @default(uuid()) @db.Uuid
+  userId       String                @db.Uuid @map("user_id")
+  eventName    String                @map("event_name")
+  payloadJson  Json                  @map("payload_json")
+  status       WebhookDeliveryStatus
+  errorMessage String?               @map("error_message")
+  processedAt  DateTime?             @map("processed_at")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  user         User                  @relation(fields: [userId], references: [id])
+
+  @@map("discord_sync_logs")
+}
+
+model WebhookDelivery {
+  id            String                @id @default(uuid()) @db.Uuid
+  userId        String?               @db.Uuid @map("user_id")
+  eventName     String                @map("event_name")
+  deliveryId    String                @unique @map("delivery_id")
+  targetUrl     String                @map("target_url")
+  payloadJson   Json                  @map("payload_json")
+  signature     String
+  status        WebhookDeliveryStatus @default(pending)
+  attemptCount  Int                   @default(0) @map("attempt_count")
+  nextAttemptAt DateTime              @default(now()) @map("next_attempt_at")
+  lastAttemptAt DateTime?             @map("last_attempt_at")
+  lastError     String?               @map("last_error")
+  processedAt   DateTime?             @map("processed_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  user          User?                 @relation(fields: [userId], references: [id])
+
+  @@index([status, nextAttemptAt])
+  @@map("webhook_deliveries")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid @map("user_id")
+  actorId   String?  @db.Uuid @map("actor_id")
+  eventType String   @map("event_type")
+  metaJson  Json     @map("meta_json")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation("AuditUser", fields: [userId], references: [id])
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([eventType, createdAt])
+  @@map("audit_logs")
+}
+
+model JobRun {
+  id            String       @id @default(uuid()) @db.Uuid
+  jobName       String       @map("job_name")
+  status        JobRunStatus
+  processedCount Int?        @map("processed_count")
+  errorSummary  String?      @map("error_summary")
+  startedAt     DateTime     @default(now()) @map("started_at")
+  finishedAt    DateTime?    @map("finished_at")
+
+  @@index([jobName, startedAt])
+  @@index([startedAt])
+  @@map("job_runs")
+}
+
+model UidSequence {
+  name         String @id
+  currentValue Int    @default(0) @map("current_value")
+
+  @@map("uid_sequence")
+}
