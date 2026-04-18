@@ -43,12 +43,20 @@ export async function GET(req: Request) {
   const bytes = canonicalJsonBytes(payload);
   const sig = signBytes(bytes);
 
+  // SHA-256 of the canonical bytes — the single most efficient way to
+  // confirm/deny parity with the client. If hashes match, the client's
+  // ed25519 implementation is at fault, not the byte serialization.
+  const { createHash } = await import("node:crypto");
+  const sha = createHash("sha256").update(bytes).digest("hex");
+
   // Raw public key in hex — matches CHEAT_OFFSETS_PUBKEY in the client.
   const pubB64 = process.env.CHEAT_OFFSETS_ED25519_PUBLIC_KEY_B64 ?? "";
   const pubHex = Buffer.from(pubB64, "base64").toString("hex");
 
   return new Response(
     [
+      `---BYTES-LENGTH---\n${bytes.length}`,
+      `---CANONICAL-SHA256---\n${sha}`,
       "---CANONICAL-BYTES---",
       bytes.toString("utf8"),
       "---SIGNATURE-B64---",
@@ -56,7 +64,6 @@ export async function GET(req: Request) {
       "---PUBLIC-KEY-HEX---",
       pubHex,
       `---KEY-ID---\n${getOffsetsKeyId()}`,
-      `---BYTES-LENGTH---\n${bytes.length}`,
     ].join("\n"),
     {
       status: 200,
