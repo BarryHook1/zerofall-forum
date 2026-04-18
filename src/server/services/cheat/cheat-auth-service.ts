@@ -36,7 +36,20 @@ export interface LoginInput {
   userAgent?: string;
 }
 
-export interface LoginSuccess {
+export interface ProfileSnapshot {
+  user: {
+    username: string;
+    uid: number | null;   // forumUid, zero-padded client-side
+    rank: string;
+  };
+  license: {
+    expiresAt: Date;
+    hwidsBound: number;
+    hwidLimit: number;
+  };
+}
+
+export interface LoginSuccess extends ProfileSnapshot {
   ok: true;
   sessionToken: string;
   expiresAt: Date;
@@ -207,11 +220,26 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     userAgent: input.userAgent,
   });
 
+  // Count includes the binding we just wrote above.
+  const hwidsBound = existingBinding
+    ? license.hwidBindings.length
+    : license.hwidBindings.length + 1;
+
   return {
     ok: true,
     sessionToken,
     expiresAt,
     heartbeatMs: HEARTBEAT_INTERVAL_MS,
+    user: {
+      username: user.username,
+      uid: user.forumUid,
+      rank: user.rank,
+    },
+    license: {
+      expiresAt: license.expiresAt,
+      hwidsBound,
+      hwidLimit: license.hwidLimit,
+    },
   };
 }
 
