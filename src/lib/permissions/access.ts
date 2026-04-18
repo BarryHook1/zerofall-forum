@@ -37,6 +37,7 @@ const ACTIVE_PATHS = [
   "/uid",
   "/ranks",
   "/badges",
+  "/cheat",
 ];
 const DORMANT_PATHS = [
   "/dashboard",

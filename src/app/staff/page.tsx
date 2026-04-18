@@ -55,6 +55,16 @@ export default async function StaffPage() {
             Open jobs
           </Link>
         </Card>
+        <Card>
+          <CardTitle>Cheat licensing</CardTitle>
+          <CardDescription className="mt-2">
+            Create and revoke loader licenses, publish signed offsets, and
+            inspect auth / heartbeat events.
+          </CardDescription>
+          <Link href="/staff/cheat" className="mt-5 inline-block text-sm text-zinc-200">
+            Open cheat ops
+          </Link>
+        </Card>
       </div>
     </SiteShell>
   );
