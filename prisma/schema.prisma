@@ -89,40 +89,67 @@ enum JobRunStatus {
   failed
 }
 
+// ── Cheat licensing ─────────────────────────────────────────────────────────
+enum CheatProduct {
+  valhalla
+}
+
+enum CheatLicenseStatus {
+  active
+  revoked
+  expired
+}
+
+enum CheatAuthOutcome {
+  success
+  bad_password
+  no_license
+  license_revoked
+  license_expired
+  hwid_mismatch
+  hwid_limit_reached
+  rate_limited
+  invalid_session
+  signature_invalid
+  server_error
+}
+
 model User {
-  id                     String             @id @default(uuid()) @db.Uuid
-  username               String             @unique
-  email                  String             @unique
-  passwordHash           String             @map("password_hash")
-  discordId              String?            @unique @map("discord_id")
-  forumUid               Int?               @unique @map("forum_uid")
-  accountRole            AccountRole        @default(member) @map("account_role")
-  entryStatus            EntryStatus        @default(visitor) @map("entry_status")
-  membershipStatus       MembershipStatus   @default(none) @map("membership_status")
-  rank                   RankCode           @default(none)
-  badgeStatus            BadgeStatus        @default(disabled) @map("badge_status")
-  activationDeadline     DateTime?          @map("activation_deadline")
-  subscriptionExpiresAt  DateTime?          @map("subscription_expires_at")
-  decayState             DecayState         @default(none) @map("decay_state")
-  lastSyncAt             DateTime?          @map("last_sync_at")
-  createdAt              DateTime           @default(now()) @map("created_at")
-  updatedAt              DateTime           @updatedAt @map("updated_at")
-  entryPurchases         EntryPurchase[]
-  activationWindow       ActivationWindow?
-  subscriptions          Subscription[]
-  ranks                  Rank[]
-  badges                 Badge[]
-  discordSyncLogs        DiscordSyncLog[]
-  webhookDeliveries      WebhookDelivery[]
-  auditLogs              AuditLog[]         @relation("AuditUser")
-  actorAuditLogs         AuditLog[]         @relation("AuditActor")
+  id                    String            @id @default(uuid()) @db.Uuid
+  username              String            @unique
+  email                 String            @unique
+  passwordHash          String            @map("password_hash")
+  discordId             String?           @unique @map("discord_id")
+  forumUid              Int?              @unique @map("forum_uid")
+  accountRole           AccountRole       @default(member) @map("account_role")
+  entryStatus           EntryStatus       @default(visitor) @map("entry_status")
+  membershipStatus      MembershipStatus  @default(none) @map("membership_status")
+  rank                  RankCode          @default(none)
+  badgeStatus           BadgeStatus       @default(disabled) @map("badge_status")
+  activationDeadline    DateTime?         @map("activation_deadline")
+  subscriptionExpiresAt DateTime?         @map("subscription_expires_at")
+  decayState            DecayState        @default(none) @map("decay_state")
+  lastSyncAt            DateTime?         @map("last_sync_at")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+  entryPurchases        EntryPurchase[]
+  activationWindow      ActivationWindow?
+  subscriptions         Subscription[]
+  ranks                 Rank[]
+  badges                Badge[]
+  discordSyncLogs       DiscordSyncLog[]
+  webhookDeliveries     WebhookDelivery[]
+  auditLogs             AuditLog[]        @relation("AuditUser")
+  actorAuditLogs        AuditLog[]        @relation("AuditActor")
+  cheatLicenses         CheatLicense[]
+  cheatOffsetsPublished CheatOffsets[]    @relation("CheatOffsetsPublisher")
 
   @@map("users")
 }
 
 model EntryPurchase {
   id                        String           @id @default(uuid()) @db.Uuid
-  userId                    String?          @db.Uuid @map("user_id")
+  userId                    String?          @map("user_id") @db.Uuid
   provider                  PurchaseProvider
   providerPaymentId         String?          @unique @map("provider_payment_id")
   providerCheckoutSessionId String?          @unique @map("provider_checkout_session_id")
@@ -140,20 +167,20 @@ model EntryPurchase {
 }
 
 model ActivationWindow {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @unique @db.Uuid @map("user_id")
-  deadlineAt DateTime  @map("deadline_at")
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @unique @map("user_id") @db.Uuid
+  deadlineAt  DateTime  @map("deadline_at")
   activatedAt DateTime? @map("activated_at")
-  revokedAt  DateTime? @map("revoked_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  user       User      @relation(fields: [userId], references: [id])
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  user        User      @relation(fields: [userId], references: [id])
 
   @@map("activation_windows")
 }
 
 model Subscription {
   id                     String               @id @default(uuid()) @db.Uuid
-  userId                 String               @db.Uuid @map("user_id")
+  userId                 String               @map("user_id") @db.Uuid
   planCode               SubscriptionPlanCode @map("plan_code")
   provider               PurchaseProvider
   providerSubscriptionId String               @unique @map("provider_subscription_id")
@@ -170,7 +197,7 @@ model Subscription {
 
 model Rank {
   id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid @map("user_id")
+  userId    String    @map("user_id") @db.Uuid
   rankCode  RankCode  @map("rank_code")
   grantedAt DateTime  @default(now()) @map("granted_at")
   revokedAt DateTime? @map("revoked_at")
@@ -181,7 +208,7 @@ model Rank {
 
 model Badge {
   id        String      @id @default(uuid()) @db.Uuid
-  userId    String      @db.Uuid @map("user_id")
+  userId    String      @map("user_id") @db.Uuid
   badgeCode RankCode    @map("badge_code")
   status    BadgeStatus
   grantedAt DateTime    @default(now()) @map("granted_at")
@@ -193,7 +220,7 @@ model Badge {
 
 model DiscordSyncLog {
   id           String                @id @default(uuid()) @db.Uuid
-  userId       String                @db.Uuid @map("user_id")
+  userId       String                @map("user_id") @db.Uuid
   eventName    String                @map("event_name")
   payloadJson  Json                  @map("payload_json")
   status       WebhookDeliveryStatus
@@ -207,7 +234,7 @@ model DiscordSyncLog {
 
 model WebhookDelivery {
   id            String                @id @default(uuid()) @db.Uuid
-  userId        String?               @db.Uuid @map("user_id")
+  userId        String?               @map("user_id") @db.Uuid
   eventName     String                @map("event_name")
   deliveryId    String                @unique @map("delivery_id")
   targetUrl     String                @map("target_url")
@@ -228,8 +255,8 @@ model WebhookDelivery {
 
 model AuditLog {
   id        String   @id @default(uuid()) @db.Uuid
-  userId    String?  @db.Uuid @map("user_id")
-  actorId   String?  @db.Uuid @map("actor_id")
+  userId    String?  @map("user_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
   eventType String   @map("event_type")
   metaJson  Json     @map("meta_json")
   createdAt DateTime @default(now()) @map("created_at")
@@ -241,13 +268,13 @@ model AuditLog {
 }
 
 model JobRun {
-  id            String       @id @default(uuid()) @db.Uuid
-  jobName       String       @map("job_name")
-  status        JobRunStatus
-  processedCount Int?        @map("processed_count")
-  errorSummary  String?      @map("error_summary")
-  startedAt     DateTime     @default(now()) @map("started_at")
-  finishedAt    DateTime?    @map("finished_at")
+  id             String       @id @default(uuid()) @db.Uuid
+  jobName        String       @map("job_name")
+  status         JobRunStatus
+  processedCount Int?         @map("processed_count")
+  errorSummary   String?      @map("error_summary")
+  startedAt      DateTime     @default(now()) @map("started_at")
+  finishedAt     DateTime?    @map("finished_at")
 
   @@index([jobName, startedAt])
   @@index([startedAt])
@@ -259,4 +286,111 @@ model UidSequence {
   currentValue Int    @default(0) @map("current_value")
 
   @@map("uid_sequence")
+}
+
+// ── Cheat licensing models ──────────────────────────────────────────────────
+
+/// One per user per product. Governs whether a user can log in to the loader.
+model CheatLicense {
+  id           String             @id @default(uuid()) @db.Uuid
+  userId       String             @map("user_id") @db.Uuid
+  product      CheatProduct
+  licenseKey   String             @unique @map("license_key") // opaque, random
+  status       CheatLicenseStatus @default(active)
+  hwidLimit    Int                @default(2) @map("hwid_limit")
+  expiresAt    DateTime           @map("expires_at")
+  revokedAt    DateTime?          @map("revoked_at")
+  revokeReason String?            @map("revoke_reason")
+  notes        String?
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  user         User               @relation(fields: [userId], references: [id])
+  hwidBindings CheatHwidBinding[]
+  sessions     CheatSession[]
+  authLogs     CheatAuthLog[]
+
+  @@unique([userId, product])
+  @@index([status, expiresAt])
+  @@map("cheat_licenses")
+}
+
+/// HWIDs bound to a license. Insert on first successful login per HWID;
+/// reject further HWIDs once count >= license.hwidLimit.
+model CheatHwidBinding {
+  id          String   @id @default(uuid()) @db.Uuid
+  licenseId   String   @map("license_id") @db.Uuid
+  hwid        String // sha256 hex, 64 chars
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  lastIp      String?  @map("last_ip")
+
+  license CheatLicense @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, hwid])
+  @@index([hwid])
+  @@map("cheat_hwid_bindings")
+}
+
+/// Short-lived session. Created on login, refreshed on heartbeat.
+/// Invalid once expiresAt < now OR lastHeartbeatAt too old (cleanup job).
+model CheatSession {
+  id              String    @id @default(uuid()) @db.Uuid
+  sessionToken    String    @unique @map("session_token") // opaque random
+  licenseId       String    @map("license_id") @db.Uuid
+  hwid            String
+  ipAddress       String?   @map("ip_address")
+  userAgent       String?   @map("user_agent")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  lastHeartbeatAt DateTime  @default(now()) @map("last_heartbeat_at")
+  expiresAt       DateTime  @map("expires_at")
+  revokedAt       DateTime? @map("revoked_at")
+
+  license CheatLicense @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([licenseId, createdAt])
+  @@map("cheat_sessions")
+}
+
+/// Versioned offsets + signature. Only the row with active=true is served.
+/// publishedBy tracks which admin uploaded the version.
+model CheatOffsets {
+  id            String       @id @default(uuid()) @db.Uuid
+  product       CheatProduct
+  version       Int
+  offsetsJson   Json         @map("offsets_json")
+  signature     String // Ed25519 sig over canonical(offsetsJson|version|product), base64
+  publicKeyId   String       @map("public_key_id") // matches key id in env; rotation support
+  publishedById String?      @map("published_by_id") @db.Uuid
+  active        Boolean      @default(false)
+  publishedAt   DateTime     @default(now()) @map("published_at")
+  notes         String?
+
+  publishedBy User? @relation("CheatOffsetsPublisher", fields: [publishedById], references: [id])
+
+  @@unique([product, version])
+  @@index([product, active])
+  @@map("cheat_offsets")
+}
+
+/// Audit log for cheat auth + heartbeat events. Drives admin panels + alerts.
+model CheatAuthLog {
+  id        String           @id @default(uuid()) @db.Uuid
+  licenseId String?          @map("license_id") @db.Uuid
+  username  String? // captured even on no-license/bad-password
+  hwid      String?
+  ipAddress String?          @map("ip_address")
+  userAgent String?          @map("user_agent")
+  outcome   CheatAuthOutcome
+  event     String // "login" | "heartbeat" | "logout" | "download"
+  detail    String?
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  license CheatLicense? @relation(fields: [licenseId], references: [id])
+
+  @@index([outcome, createdAt])
+  @@index([ipAddress, createdAt])
+  @@index([licenseId, createdAt])
+  @@map("cheat_auth_logs")
 }
